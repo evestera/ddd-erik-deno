@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: erik-deno-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: erik-deno
+  template:
+    metadata:
+      labels:
+        run: erik-deno
+    spec:
+      containers:
+      - name: erik-deno-instance
+        image: eu.gcr.io/developmenttest-291822/erik-deno:latest

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: erik-deno-service
+  namespace: "default"
+  annotations:
+    beta.cloud.google.com/backend-config: '{"ports": {"80":"ws-backendconfig"}}'
+spec:
+  type: NodePort
+  selector:
+    run: "erik-deno"
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 4000
