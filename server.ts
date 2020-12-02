@@ -1,4 +1,5 @@
 import { Application } from "./application.ts";
+import { serveFile } from "https://deno.land/std@0.79.0/http/file_server.ts";
 
 const port = parseInt(Deno.env.get("PORT") || "") || 4000;
 const selfUrl = `http://localhost:${port}`;
@@ -35,6 +36,10 @@ app.router.handle("GET", "/health", async () => ({
   body: JSON.stringify({ status: "OK" }),
 }));
 
+app.router.handle("GET", "/profile.png", async (req) => (
+  serveFile(req, "./profile.png")
+));
+
 app.router.handle("GET", "/metadata", async () => ({
   headers: new Headers({ "Content-Type": "application/json" }),
   body: JSON.stringify({
@@ -49,25 +54,9 @@ app.router.handle("GET", "/metadata", async () => ({
   }),
 }));
 
-app.router.handle("GET", "/", async () => ({
-  headers: new Headers({ "Content-Type": "text/html" }),
-  body: `
-  <html>
-  <head>
-    <title>Erik Deno</title>
-  </head>
-  <body>
-      <h2>Metadata</h2>
-      <div class="widget-erik-boot-describe-self"></div>
-      <script src="https://ddd-erik-boot.herokuapp.com/widget-describe-self.js"></script>
-
-      <h2>Known nodes</h2>
-      <div class="widget-erik-boot-own-nodes"></div>
-      <script src="https://ddd-erik-boot.herokuapp.com/widget-own-nodes.js"></script>
-  </body>
-  </html>
-  `,
-}));
+app.router.handle("GET", "/", async (req) => (
+  serveFile(req, "index.html")
+));
 
 const knownUrls: Set<string> = new Set<string>();
 
