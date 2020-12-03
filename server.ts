@@ -1,9 +1,11 @@
-import { Application } from "./application.ts";
-import { serveFile } from "https://deno.land/std@0.79.0/http/file_server.ts";
+import {Application} from "./application.ts";
+import {serveFile} from "https://deno.land/std@0.79.0/http/file_server.ts";
+import {main as crawlerMain} from "./crawler.ts";
+import {createSingleLock} from "./lock.ts";
 
 const port = parseInt(Deno.env.get("PORT") || "") || 4000;
 const selfUrl = `http://localhost:${port}`;
-const app = new Application({ port });
+const app = new Application({port});
 console.log(`Creating server at ${selfUrl}`);
 
 async function healthCheck(url: string): Promise<boolean> {
@@ -32,8 +34,8 @@ async function notify(url: string): Promise<void> {
 }
 
 app.router.handle("GET", "/health", async () => ({
-  headers: new Headers({ "Content-Type": "application/json" }),
-  body: JSON.stringify({ status: "OK" }),
+  headers: new Headers({"Content-Type": "application/json"}),
+  body: JSON.stringify({status: "OK"}),
 }));
 
 app.router.handle("GET", "/profile.png", async (req) => (
@@ -44,7 +46,7 @@ app.router.handle("GET", "/profile.png", async (req) => (
 ));
 
 app.router.handle("GET", "/metadata", async () => ({
-  headers: new Headers({ "Content-Type": "application/json" }),
+  headers: new Headers({"Content-Type": "application/json"}),
   body: JSON.stringify({
     name: "Eriks Deno node",
     owner: "Erik Vesteraas",
@@ -82,9 +84,40 @@ app.router.handle("POST", "/nodes", async (req) => {
 });
 
 app.router.handle("GET", "/nodes", async () => ({
-  headers: new Headers({ "Content-Type": "application/json" }),
+  headers: new Headers({"Content-Type": "application/json"}),
   body: JSON.stringify(Array.from(knownUrls)),
 }));
+
+let lastCrawlerRun: undefined | number = undefined;
+const generationLock = createSingleLock();
+app.router.handle("GET", "/network.svg", async (req) => {
+
+  await generationLock(async () => {
+    // only generate once an hour and only if requested:
+    if (!lastCrawlerRun || (lastCrawlerRun + 3_600_000) < Date.now()) {
+      console.log("[/network.svg] Generating new file");
+      await crawlerMain();
+      const process = Deno.run({cmd: ["neato", "-Tsvg", "-o", "network.svg", "network.dot"]});
+      await process.status();
+      console.log("[/network.svg] Finished generating");
+      lastCrawlerRun = Date.now();
+    } else {
+      console.log(`[/network.svg] Serving file generated ${Math.round((Date.now() - lastCrawlerRun) / 60_000)} minutes ago`);
+    }
+  });
+
+  return serveFile(req, "network.svg").then(res => {
+    res.headers!.set("Content-Type", "image/svg+xml");
+    return res;
+  });
+});
+
+app.router.handle("GET", /\/images\/[a-z0-9\-.]+\.png/, async (req, pathname) => {
+  return serveFile(req, "." + pathname).then(res => {
+    res.headers!.set("Content-Type", "image/png"); // Deno serveFile MEDIA_TYPES does not include .png
+    return res;
+  });
+})
 
 setInterval(() => {
   knownUrls.forEach(async (nodeUrl) => {
@@ -92,7 +125,7 @@ setInterval(() => {
       knownUrls.delete(nodeUrl);
     }
   });
-}, 60000);
+}, 60_000);
 
 const notifyUrls = Deno.env.get("NOTIFY_URLS");
 if (notifyUrls) {
