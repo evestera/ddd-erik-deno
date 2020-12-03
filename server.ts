@@ -37,7 +37,10 @@ app.router.handle("GET", "/health", async () => ({
 }));
 
 app.router.handle("GET", "/profile.png", async (req) => (
-  serveFile(req, "./profile.png")
+  serveFile(req, "./profile.png").then(res => {
+    res.headers!.set("Content-Type", "image/png"); // Deno serveFile MEDIA_TYPES does not include .png
+    return res;
+  })
 ));
 
 app.router.handle("GET", "/metadata", async () => ({
